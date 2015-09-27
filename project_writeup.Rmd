@@ -3,8 +3,8 @@ title: "Practical Machine Learning Project-write up"
 author: "Geeta Nain"
 date: "September 25, 2015"
 output:
-  word_document: default
   html_document: default
+  word_document: default
 keep_md: yes
 ---
 
