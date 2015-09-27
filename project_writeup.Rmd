@@ -2,8 +2,10 @@
 title: "Practical Machine Learning Project-write up"
 author: "Geeta Nain"
 date: "September 25, 2015"
-output: html_document
-keep_md: true
+output:
+  html_document: default
+  word_document: default
+keep_md: yes
 ---
 
 ##Introduction
