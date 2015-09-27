@@ -1,0 +1,164 @@
+---
+title: "Practical Machine Learning Project-write up"
+author: "Geeta Nain"
+date: "September 25, 2015"
+output: html_document
+keep_md: true
+---
+
+##Introduction
+
+- We have training and testing datasets from accelerometers on the belt, forearm, arm, and dumbell of six participants, who participated in dumbell lifting exercise in five different way.The five ways, as described in the study, were Class A (exactly according to the specification),  Class B (throwing the elbows to the front) , Class C (lifting the dumbbell only halfway) ,  class D (lowering the dumbbell only halfway) and  Class E (throwing the hips to the front).
+-Training data consists of accelerometer data (having all these classes) and a label(classe) identifying the quality of the activity the participant was doing. Our testing data consists of accelerometer data (all classes) without the identifying label. so, This report consist mainly following points to predict the manner (lebel) for 20 testing observation.
+
+1.Data preprocessing
+2.Building Model using different methods (i.e. rpart, rf etc.)
+3.Applying cross validation 
+4.Estimated out of sample error 
+4.Predictions 
+
+## Data Preprocessing
+
+1.Loading packages and importing data
+```{r}
+library(AppliedPredictiveModeling)
+library(caret)
+library(rattle)
+library(rpart.plot)
+library(randomForest)
+training <- "pml-training.csv"
+testing <- "pml-testing.csv"
+
+# Importing data considering null values as NA
+training <- read.csv(training, na.strings=c("NA",""), header=TRUE)
+column_training <- colnames(training)
+
+testing <- read.csv(testing, na.strings=c("NA",""), header=TRUE)
+column_testing <- colnames(testing)
+
+# Verify that the column names (excluding classe and problem_id) are identical in the training and test set.
+all.equal(column_training[1:length(column_training)-1], column_testing[1:length(column_training)-1])
+
+```
+2. Partioning the data 
+
+```{r}
+
+Train <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+trainpart <- training[Train, ];
+testpart <- training[-Train, ]
+dim(trainpart)
+dim(testpart)
+```
+3. Removing columns having Nas values , zero variance and  which do not make sense for predictions.
+
+```{r}
+# remove variables that are almost always NA
+NAs <- sapply(trainpart, function(x) mean(is.na(x))) > 0.95
+trainpart <- trainpart[, NAs==F]
+testpart <- testpart[, NAs==F]
+
+# remove variables with nearly zero variance
+nzv <- nearZeroVar(trainpart)
+trainpart <- trainpart[, -nzv]
+testpart <- testpart[, -nzv]
+
+# remove variables that don't make sense for prediction (X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_windo, num_window), which are the first seven variables
+trainpart <- trainpart[, -(1:7)]
+testpart <- testpart[, -(1:7)]
+
+```
+
+## Building model using different method
+
+### Model1 using method rpart 
+
+1. With no extra features.
+```{r}
+set.seed(666)
+modFit <- train(trainpart$classe ~ ., data =trainpart, method="rpart")
+
+print(modFit, digits=3)
+print(modFit$finalModel, digits=3)
+fancyRpartPlot(modFit$finalModel)
+
+predictions <- predict(modFit, newdata=testpart)
+print(confusionMatrix(predictions, testpart$classe), digits=4)
+```
+* Here, there is very low accuracy as (.4827), so I will try including standardization preprocessing* 
+
+2. With only preprocessing.
+```{r}
+set.seed(666)
+modFit <- train(trainpart$classe ~ .,  preProcess=c("center", "scale"), data = trainpart, method="rpart")
+print(modFit, digits=3)
+```
+3. With only cross validation.
+```{r}
+set.seed(666)
+modFit <- train(trainpart$classe ~ .,  trControl=trainControl(method = "cv", number = 4), data = trainpart, method="rpart")
+print(modFit, digits=3)
+```
+
+4. With both preprocessing and cross validation.
+```{r}
+set.seed(666)
+modFit <- train(trainpart$classe ~ .,  preProcess=c("center", "scale"), trControl=trainControl(method = "cv", number = 4), data =trainpart, method="rpart")
+print(modFit, digits=3)
+```
+
+5. Predictions on test part  with (4th model) both preprocessing and cross validation.
+```{r}
+predictions <- predict(modFit, newdata=testpart)
+print(confusionMatrix(predictions, testpart$classe), digits=4)
+```
+**there is no impact of incorporating both preprocessing and cross validation in accuracy (.4827). lets try using different method for building model**
+
+### Model 2 using method random forest
+
+1. With cross validation
+```{r}
+# Train on trainpart with only cross validation.
+set.seed(666)
+modFit <- train(trainpart$classe ~ ., method="rf", trControl=trainControl(method = "cv", number = 4), data=trainpart)
+print(modFit, digits=3)
+```
+
+2. Prediction using this model against testset.
+```{r}
+predictions <- predict(modFit, newdata=testpart)
+print(confusionMatrix(predictions, testpart$classe), digits=4)
+```
+
+## Predictions 2 based on model 2 (using random forcast method and cross validation)
+```{r}
+# predictions based on model build in previous step against 20 testing set provided .
+print(predict(modFit, newdata=testing))
+```
+
+### Model 2 using method random forest With only both preprocessing and cross validation.
+```{r}
+set.seed(666)
+modFit <- train(trainpart$classe ~ ., method="rf", preProcess=c("center", "scale"), trControl=trainControl(method = "cv", number = 4), data=trainpart)
+print(modFit, digits=3)
+```
+
+### Prediction using this model against testpart
+```{r}
+predictions <- predict(modFit, newdata=testpart)
+print(confusionMatrix(predictions, testpart$classe), digits=4)
+```
+
+### Predictions against 20 testing set observation based on final model
+```{r}
+print(predict(modFit, newdata=testing))
+```
+*Preprocessing actually rose the accuracy rate from 0.9904 to 0.9908 against the training set. Thus I decided to apply both preprocessing and cross validation to final model.*
+
+### Out of sample error
+- Random Forest (preprocessing and cross validation) Testpart (part from training data set) : 1-.9908=0.012
+
+
+###Predictions
+- B A B A A E D B A A B C B A E E A B B B
+
